@@ -56,21 +56,6 @@ public defn test-trees () :
         ]
         println("result: %_" % [apply-child-possibility(order)])
 
-    println("\ntest apply-childs-possibilites")
-    let :
-        val child-ps = List(
-            List(
-                (tr("R") - tr("1") - tr("2")),
-                (tr("R") - (tr("1") - tr("2")))
-            ),
-            List(
-                (tr("R") - tr("1") - tr("2") - tr("3")),
-                (tr("R") - (tr("R") - tr("1")) - tr("2"))
-            )
-        )
-        for p in child-ps apply-childs-possibilities :
-            println("P:\n%_" % [p])
-
     println("\ntest apply-repartition")
     let : 
         val repartitions = List(1, 2, 2)
@@ -94,10 +79,14 @@ public defn test-utils () :
 
     println("\ntest all-combinations")
     let :
-        val list-set: List<List<String>> = List(
-            List("A1", "B1", "C1"),
-            List("A2", "B2", "C2"),
-            List("A3", "B3", "C3")
+        val list-set: List<List<List<String>>> = List(
+            List(List("A1")),
+            List(List("A2", "A2"),
+                 List("A2", "B2"),
+                 List("B2", "B2")),
+            List(List("A3"),
+                 List("B3"),
+                 List("C3"))
         )
         for c in list-set all-combinations :
             println("%_" % [c])

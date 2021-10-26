@@ -15,6 +15,7 @@ So in the mean time, modify the src/main.stanza file to your needs and recompile
 You can, change the number of nodes per tree and print the tests, or anything else.
 
 ## How does it work ?
+### trees-with-n-nodes
 The most important function is this one:
 ```clojure
 public defn trees-with-n-nodes (N: Int) :
@@ -136,6 +137,197 @@ for repartition in repartitions do :
 	for t in repartition apply-repartition:
 		yield(t)
 ```
+
+### apply-repartition
+The second most important function is this one:
+```clojure
+public defn apply-repartition (repartitions: List<Int>) :
+		[...]
+		; those lines aren't very important
+    val groups: List<List<Int>> = map(fn (g) : map({_[1]}, g), to-list(tmp-groups))
+```
+The only argument it takes is the repartitions, let's say `(0 0 2 2)`.
+It doesn't even need the *base-tree* to work, it can deduce it from the repartitions.
+The first thing this function does it grouping the repartitions together by value.
+The first few lines are just there to keep the order when grouping
+to avoid that for example this repartition:
+`(1 2 2 3)` (which isn't realistic but let's pretend) is groupped this way:
+`((2 2) (1) (3)`. The order doesn't really matter at the end but we would like to keep it
+the closest to the original repartition because the order corresponds to which child will become what.
+So we would prefer the previous repartition to be grouped this way:
+`((1) (2 2) (3)`.
+Anyway, the reason behind grouping the repartition by value is that if you don't do that, you'll eventually end up generating **final trees** with the same topological structure which is wrong, we'll see an example of that later.
+
+Now that we have groups, we loop though each group: 
+```clojure
+    for g in groups do :
+        val r = g[0]
+```
+And we retrieve common "r" value of the group which is the number of nodes to add to each child.
+This is better understand with an example, let's keep the same repartition as above `(1 2 2 3)`.
+From this, we can deduce that the original *base-tree* looked like this (I named the root-children for clarity):
+```
+R
+├── A
+├── B
+├── C
+└── D
+```
+The grouped partition would look like that: `((1) (2 2) (3))`.
+The first group `(1)` has an r value of 1, and corresponds to the child `A`.
+The second group `(2 2)` has an r value of 2 and corresponds to the children `B` and `C`.
+The last group `(3)` has an r value of 3 and corresponds to the child `D`.
+So you see that each grouped repartition value can be directly mapped to a child by reading it in depth-first order.
+
+Next we compute the `group-c-ps` group-child-possibilites for each group.
+```clojure
+val group-c-ps = if r == 0 :
+[...]
+```
+The `group-c-ps` associated with each group is a list of all the possible trees that have r+1 nodes.
+So let's consider the first group `(1)`. It's r = 1 so its associated `group-c-ps` corresponds to
+all the possible trees with 2 nodes. Which is exactly what computes the trees-with-n-nodes function.
+```clojure
+val group-c-ps = if r == 0 :
+	to-array<Tree<String>>([ make-tree(0) ])
+else :
+	to-array<Tree<String>>(trees-with-n-nodes(r + 1))
+```
+We make 2 different cases because the trees-with-n-nodes function doesn't work well on trees with 1 node.
+Now we have this `group-c-ps` list which is like a catalog of all the possible trees that we could use.
+But now we need to associate them together.
+Let's stop talking with trees for a minute and say that the `group-c-ps` catalog is a car catalog:
+`(BMW PEUGEOT VOLKSWAGEN)`. And let's pretend that the group looked like (2 2). The r value of the group is 2. The catalog contains 3 different car models.
+Now we have to generate all the possible combinations of two cars in the catalog. A combination (BMW PEUGEOT) is considered the same as a combination (PEUGEOT BMW).
+For our example all the possible combinations would look like:
+```
+(BMW BMW)
+(BMW PEUGEOT)
+(BMW VOLKSWAGEN)
+(VOLKSWAGEN VOLKSWAGEN)
+(VOLKSWAGEN PEUGEOT)
+(PEUGEOT PEUGEOT)
+```
+This is exactly what the combinations-with-replacement function does.
+Check out it's definition in the [python's itertools doc](https://docs.python.org/3/library/itertools.html#itertools.combinations_with_replacement).
+
+Now let's get back to our trees. We compute all the possible combinations of n-trees from our catalog
+where n is the number of items in the group.
+In our previous example, the group was `(2 2)` so the catalog looked like:
+```
+Tree A:
+R
+├── 1
+└── 2
+Tree B:
+R
+└── R
+    └── 1
+```
+The length of the group is 2, meaning there are two values in it. So we compute all the combinations of
+A-Tree's and B-Tree's: 
+```clojure
+val ps: List<List<Tree<String>>> = to-list(combinations-with-replacement(group-c-ps, length(g)))
+```
+`ps`(which stands for possibilities) is equal to
+```
+(
+	(A A)
+	(A B)
+	(B B)
+)
+```
+Now that we have computed all combination possibilities for each group. We collect them together in a final list called `groups-ps`:
+```clojure
+add(groups-ps, ps)
+```
+With a grouped repartition like so: `((1) (2 2) (3))`, the final `groups-ps` would like like that:
+```
+(
+	((A1))
+
+	((A2 A2)
+	 (A2 B2)
+	 (B2 B2))
+
+	((A3)
+	 (B3)
+	 (C3))
+)
+```
+Where
+A1 is the only possible tree with 1+1=2 nodes.
+A2 and B2 are different possible trees with 2+1=3 nodes.
+A3, B3 and C3 are different possible trees with 3+1=4 nodes.
+
+And we're not done yet... Now make all possible combinations for all possibilities of each group.
+This is done with the `all-combinations` function and the resulting combinations for our example look like that:
+```clojure
+for combination in to-list(groups-ps) all-combinations :
+```
+```
+((A1) (A2 A2) (A3))
+((A1) (A2 A2) (B3))
+((A1) (A2 A2) (C3))
+((A1) (A2 B2) (A3))
+((A1) (A2 B2) (B3))
+((A1) (A2 B2) (C3))
+((A1) (B2 B2) (A3))
+((A1) (B2 B2) (B3))
+((A1) (B2 B2) (C3))
+```
+And here we start see the end of the tunnel, this look very much like a list of children, except that we need to flatten everything up:
+```clojure
+val childs = to-list(lazy-flatten(combination))
+```
+We get this flattened list of children
+```
+(A1 A2 A2 A3)
+(A1 A2 A2 B3)
+(A1 A2 A2 C3)
+(A1 A2 B2 A3)
+(A1 A2 B2 B3)
+(A1 A2 B2 C3)
+(A1 B2 B2 A3)
+(A1 B2 B2 B3)
+(A1 B2 B2 C3)
+```
+So we have a list of children, let's take the first one of this example `(A1 A2 A2 A3)`.
+This means that the corresponding **final tree** will have A1 as subtree for his first child,
+A2 for his second child and A3 for his last child.
+We know that A1 is the only possible tree with 2 nodes.
+We know that A2 is the first possible tree with 3 nodes.
+And we know that A3 is the first possible tree with 4 nodes.
+So we have:
+```
+A1:     A2:     A3:
+R       R       R
+└── 1   ├── 1   ├── 1
+        └── 2   ├── 2
+                └── 3
+```
+So applying this list of children `(A1 A2 A2 A3)` would result in this **final tree**:
+```
+R
+├── R
+│   └── 1
+├── R
+│   ├── 1
+│   └── 2
+├── R
+│   ├── 1
+│   └── 2
+└── R
+    ├── 1
+    ├── 2
+    └── 3
+```
+So we give each child list to the already apply-child-possibility function and we yield the returned tree.
+```clojure
+yield(apply-child-possibility(childs))
+```
+
+And this is how this algorithm works.
 
 ## Help
 This is just a little project, but feel free to fork, change, extend or correct the code.

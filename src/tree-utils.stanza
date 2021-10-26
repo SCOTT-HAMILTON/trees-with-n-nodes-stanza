@@ -25,18 +25,6 @@ public defn apply-child-possibility (
         add-child(tree, DeepCopy(c))
     tree
 
-public defn apply-childs-possibilities (child-ps: List<List<Tree<String>>>):
-    generate<Tree<String>> :
-        for order in child-ps all-combinations:
-            yield(apply-child-possibility(order))
-        break()
-
-public defn apply-childs-possibilities (f: Tree<String> -> False, child-ps: List<List<Tree<String>>>) :
-    val seq = apply-childs-possibilities(child-ps)
-    while not empty?(seq) :
-          f(next(seq))
-
-
 public defn apply-repartition (repartitions: List<Int>) :
     val groups-ps = Vector<List<List<Tree<String>>>>()
     val indexed-reparts = zip(0 to length(repartitions), repartitions)
@@ -52,16 +40,8 @@ public defn apply-repartition (repartitions: List<Int>) :
         val r = g[0]
         val group-c-ps = if r == 0 :
             to-array<Tree<String>>([ make-tree(0) ])
-        else if r == 1 :
-            to-array<Tree<String>>([ make-tree(1) ])
         else :
-            if r == 2 :
-                to-array<Tree<String>>([
-                    (tr("R") - tr("1") - tr("2")),
-                    (tr("R") - (tr("1") - tr("1")))
-                ])
-            else :
-                to-array<Tree<String>>(trees-with-n-nodes(r + 1))
+            to-array<Tree<String>>(trees-with-n-nodes(r + 1))
         val ps: List<List<Tree<String>>> = to-list(combinations-with-replacement(group-c-ps, length(g)))
         add(groups-ps, ps)
 
