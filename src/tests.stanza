@@ -1,0 +1,107 @@
+defpackage tree/tests :
+   import core
+   import tree
+   import tree/utils
+   import utils
+
+public defn test-trees () :
+    println("test tree 1")
+    let :
+        var tree = Tree("R")
+        var t1 = Tree("1")
+        add-child(t1, "2")
+        add-child(t1, "3")
+        add-child(tree, t1)
+        add-child(tree, "4")
+        add-child(tree, "5")
+        println("Tree: %_\n" % [ tree ])
+
+    println("\ntest tree 2")
+    let :
+        var tree = Tree("R")
+        var t1 = Tree("R")
+        add-child(t1, "1")
+        var t2 = Tree("R")
+        add-child(t2, "1")
+        var t3 = Tree("R")
+        add-child(t3, t1)
+        add-child(t3, t2)
+        add-child(tree, t3)
+        println("Tree: %_\n" % [ tree ])
+
+    println("\ntest make-tree")
+    let :
+        var tree = make-tree(4)
+        println("Tree: %_" % [ tree ])
+
+    println("\ntest tree notation")
+    let :
+        var tree =
+        tr("R")
+            - (tr("R")
+                - (tr("R") - tr("1"))
+                - (tr("R")
+                    - tr("1")
+                    - tr("2")
+                  )
+              )
+        println("Tree: %_" % [ tree ])
+    
+    println("\ntest apply-child-possibility")
+    let :
+        val order = [
+            (tr("R") - tr("1") - tr("2"))
+            (tr("R") - (tr("R") - tr("2") - tr("3")))
+            (tr("R") - tr("1") - tr("2") - tr("3"))
+        ]
+        println("result: %_" % [apply-child-possibility(order)])
+
+    println("\ntest apply-childs-possibilites")
+    let :
+        val child-ps = List(
+            List(
+                (tr("R") - tr("1") - tr("2")),
+                (tr("R") - (tr("1") - tr("2")))
+            ),
+            List(
+                (tr("R") - tr("1") - tr("2") - tr("3")),
+                (tr("R") - (tr("R") - tr("1")) - tr("2"))
+            )
+        )
+        for p in child-ps apply-childs-possibilities :
+            println("P:\n%_" % [p])
+
+    println("\ntest apply-repartition")
+    let : 
+        val repartitions = List(1, 2, 2)
+        for p in repartitions apply-repartition :
+            println("P: %_" % [p])
+
+    println("\ntest set-child")
+    let :
+        val child = tr("R") - (tr("R") - tr("1") - tr("2")) - tr("1")
+        println("child: %_" % [child])
+        val tree = tr("R") - (tr("R") - tr("1")) - (tr("R") - tr("1")) - (tr("R") - tr("1"))
+        println("tree b: %_" % [tree])
+        set-child(tree, 0, child)
+        println("tree a: %_" % [tree])
+
+public defn test-utils () :
+    println("test repart")
+    let :
+        for r in repart(7, 7) do :
+            println("%_" % [r])
+
+    println("\ntest all-combinations")
+    let :
+        val list-set: List<List<String>> = List(
+            List("A1", "B1", "C1"),
+            List("A2", "B2", "C2"),
+            List("A3", "B3", "C3")
+        )
+        for c in list-set all-combinations :
+            println("%_" % [c])
+    println("\ntest combinations-with-replacement")
+    let :
+        for c in List("A", "B", "C") combinations-with-replacement<String>(2) :
+            println("%_" % [c])

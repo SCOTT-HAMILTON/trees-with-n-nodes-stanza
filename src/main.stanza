@@ -1,0 +1,20 @@
+defpackage tree/main :
+   import core
+   import collections
+   import tree
+   import tree/utils
+   import tree/tests
+   import utils
+
+    
+
+defn main () :
+    ; test-trees()
+    ; test-utils()
+    var counter = 0
+    for t in 6 trees-with-n-nodes :
+        counter = counter + 1
+        ; println("t: %_" % [t])
+    println("counter: %_" % [counter])
+
+main()

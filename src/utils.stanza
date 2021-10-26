@@ -1,0 +1,108 @@
+defpackage utils :
+   import core
+   import collections
+
+public defn repart (R: Int, N: Int, M: Int|False) -> List<List<Int>> :
+    val start = match(M) :
+        (_:False) : R
+        (m:Int) : min(m, R)
+    val possibilities = Vector<List<Int>>()
+    ; println("Start: %_" % [start])
+    label<False> break :
+        for i in in-reverse(1 to (start + 1)) do :
+            ; println("I: %_" % [i])
+            val left = R - i
+            if N - 1 < left:
+                break(false)
+            val b = Array<Int>(N, 0)
+            b[length(b) - 1] = i
+            if left == 0 :
+                add(possibilities, to-list(b))
+            else if left == 1 :
+                b[length(b) - 2] = 1
+                add(possibilities, to-list(b))
+            else if left > 1 :
+                val leftPossibilities = repart(left, N - 1, i)
+                for p in leftPossibilities do :
+                    val concat = to-vector<Int>(p)
+                    add(concat, i)
+                    add(possibilities, to-list(concat))
+            false
+    to-list(possibilities)
+
+public defn repart (R: Int, N: Int) -> List<List<Int>> :
+    repart(R, N, false)
+
+public defn all-combinations<?T> (list-set: List<List<?T>>) :
+    generate<List<T>> :
+        defn order-to-values (order: Seqable<Int> & Lengthable) :
+            val list-order = to-list(order)
+            map(fn (o: Int, index: Int): list-set[index][o], list-order, 0 to length(list-order))
+        if length(list-set) == 1:
+            for p in list-set[0] do :
+                yield(List(p))
+            break()
+        val last-index = length(list-set) - 1
+        var current-index = last-index
+        val current-order = Array<Int>(length(list-set), 0)
+        yield(order-to-values(current-order))
+        while true:
+            val current-order-index = current-order[current-index]
+            val current-max-order-index = length(list-set[current-index]) - 1
+            if current-order-index == current-max-order-index :
+                current-order[current-index] = 0
+                current-index = current-index - 1
+                if current-index == 0 and
+                        current-order[current-index] == length(list-set[current-index]) - 1 :
+                    break()
+            else :
+                current-order[current-index] = current-order[current-index] + 1
+                yield(order-to-values(current-order))
+                if current-index < last-index:
+                    current-index = last-index
+
+public defn all-combinations<?T> (f: List<T> -> False, list-set: List<List<?T>>) :
+    val seq = all-combinations(list-set)
+    while not empty?(seq) :
+          f(next(seq))
+
+public defn group-by<?T,?K,?V> (xkey:T -> ?K&Hashable&Equalable,
+                                xval:T -> ?V,
+                                xs:Seqable<?T>) -> HashTable<K,List<V>> :
+  val table = HashTable<K,List<V>>(List())
+  for x in xs do :
+    update(table, cons{xval(x), _}, xkey(x))
+  table
+
+public defn group-by<?T,?K> (xkey:T -> ?K&Hashable&Equalable,
+                             xs:Seqable<?T>) -> HashTable<K,List<T>> :
+  group-by(xkey, {_}, xs)
+
+public defn combinations-with-replacement<?T> (iterable: Seqable<?T>, r: Int) :
+    ; combinations-with-replacement(["A", "B", "C"], 2) --> ["A", "A"] ["A", "B"] ["A", "C"] ["B", "B"] ["B", "C"] ["C", "C"]
+    generate<List<T>> :
+        val pool = to-list(iterable)
+        val n = length(pool)
+        ; if r > n :
+        ;     break()
+        var indices: Array<Int> = Array<Int>(r, 0)
+        defn indices-to-values (indices: Array<Int>) :
+            map(fn (index: Int) : pool[index], to-list(indices))
+        yield(indices-to-values(indices))
+        while true:
+            val last-index = label<Int> loop-break :
+                for i in in-reverse(0 to r) do :
+                    if indices[i] != n - 1 :
+                        loop-break(i)
+                break()
+            val list-indices = to-list(indices)
+            val head = headn(list-indices, last-index)
+            val tail = Array<Int>(r - last-index, list-indices[last-index] + 1)
+            indices = to-array<Int>(cat(head, tail))
+            yield(indices-to-values(indices))
+
+public defn combinations-with-replacement<T> (r: Int) :
+    fn (f: List<T> -> False, iterable: Seqable<T>) :
+        val seq = combinations-with-replacement(iterable, r)
+        while not empty?(seq) :
+              f(next(seq))

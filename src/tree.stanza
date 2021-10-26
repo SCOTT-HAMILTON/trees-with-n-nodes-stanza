@@ -1,0 +1,91 @@
+defpackage tree :
+   import core
+   import collections
+
+public defstruct Tree<T> <: Collection<Tree<T>> :
+    value: T
+    children: Vector<Tree<T>>
+    parent: Tree<T>|False with: (setter => set-parent)
+public defmulti degree (t:Tree) -> Int
+public defmulti add-child<?T> (t:Tree<?T>, child-value: T) -> False
+public defmulti add-child<?T> (t:Tree<?T>, child-tree: Tree<T>) -> False
+public defmulti set-child<?T> (t:Tree<?T>, index: Int, child-tree: Tree<T>) -> True|False
+
+public defn Tree (init-root-value: String,
+           init-parent: Tree<String>|False,
+           init-children-capacity: Int) :
+    var mchildren = Vector<Tree<String>>(init-children-capacity)
+    var mvalue = init-root-value
+    var mparent = init-parent
+
+    new Tree<String> :
+        defmethod value (this) : mvalue
+        defmethod children (this) : mchildren
+        defmethod parent (this) : mparent
+        defmethod set-parent (this, parent: Tree<String>) : mparent = parent
+        defmethod degree (this) :
+            length(mchildren)
+        defmethod add-child (this, child-value: String) :
+            add(mchildren, Tree(child-value, this, 0))
+        defmethod add-child (this, child-tree: Tree<String>) :
+            set-parent(child-tree, this)
+            add(mchildren, child-tree)
+        defmethod set-child (this, index: Int, child-tree: Tree<String>) :
+            if index < 0 or index >= length(mchildren) :
+                false
+            else :
+                mchildren[index] = child-tree
+                set-parent(child-tree, mchildren[index])
+                true
+        defmethod to-seq (this) :
+            take-n(degree(this), mchildren)
+        defmethod print (o:OutputStream, this) :
+            println(o, "")
+            defn indent-to-spaces (indent: Int) -> String :
+                to-string(get(CharArray(indent, ' '), 0 to false))
+            defn print-tree (o:OutputStream, this: Tree<String>, indent: Int, add-base-connect: Int|False) :
+                match(parent(this)) :
+                    (p:Tree<String>) : print(o, " ")
+                    (p:False) : false
+                val t-degree = degree(this)
+                if t-degree == 0 :
+                    print(o, "%_" % [value(this)])
+                else if t-degree == 1 :
+                    println(o, "%_" % [value(this)])
+                    val prefix = "└──"
+                    match(add-base-connect) :
+                        (_:False) : print(o, "%_%_" % [indent-to-spaces(indent), prefix])
+                        (l:Int) : 
+                            val tmp = indent-to-spaces(l)
+                            print(o, "%_│" % [tmp])
+                            print(o, "%_%_" % [indent-to-spaces(indent - l - 1), prefix])
+                    val new-indent = indent + 4
+                    print-tree(o, children(this)[0], new-indent, add-base-connect)
+                else :
+                    val value-indent = indent-to-spaces(length(value(this)) - 1)
+                    println(o, "%_" % [value(this)])
+                    for c in 0 to length(children(this)) do :
+                        val islast = c == length(children(this)) - 1
+                        val spaces-indent = match(add-base-connect) :
+                            (_:False) : indent-to-spaces(indent)
+                            (l:Int) : 
+                                val tmp = indent-to-spaces(l)
+                                print(o, "%_│" % [tmp])
+                                indent-to-spaces(indent - l - 1)
+                        if islast :
+                            print(o, "%_└──" % [append(spaces-indent, value-indent)] )
+                        else :
+                            print(o, "%_├──" % [append(spaces-indent, value-indent)] )
+                        print-tree(o, children(this)[c], indent + 4, if islast : false else : indent)
+                        if not islast :
+                            println(o, "")
+            print-tree(o, this, 0, false)
+
+public defn Tree (root-value: String) :
+    Tree(root-value, false, 0)
+
+public defn DeepCopy (base: Tree<String>) -> Tree<String> :
+    var tree = Tree(value(base), false, length(children(base)))
+    for c in children(base) do :
+        add-child(tree, DeepCopy(c))
+    tree
