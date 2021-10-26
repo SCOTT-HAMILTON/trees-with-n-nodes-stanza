@@ -155,7 +155,7 @@ to avoid that for example this repartition:
 the closest to the original repartition because the order corresponds to which child will become what.
 So we would prefer the previous repartition to be grouped this way:
 `((1) (2 2) (3)`.
-Anyway, the reason behind grouping the repartition by value is that if you don't do that, you'll eventually end up generating **final trees** with the same topological structure which is wrong, we'll see an example of that later.
+Anyway, the reason behind grouping the repartition by value is that if you don't do that, you'll eventually end up generating **final trees** with the same topological structure which is wrong, we'll see an example of that [later](#side-note-on-why-grouping)
 
 Now that we have groups, we loop though each group: 
 ```clojure
