@@ -328,6 +328,62 @@ yield(apply-child-possibility(childs))
 
 And this is how this algorithm works.
 
+## Side note on why grouping
+When first implementing this algorithm in python I wasn't grouping the
+repartitions by value. But when I started implementing it in Rust cf [Implementiation in Rust](https://github.com/SCOTT-HAMILTON/trees_with_n_nodes), I realized that this could lead to topologically-equal generated trees.
+For example, let's take the previous repartition `(1 2 2 3)`.
+The previous algorithm would have generated those two **final trees** among others:
+```
+1.
+R
+├── R
+│   └── 1
+├── R
+│   └── R
+│       └── 1
+├── R
+│   ├── 1
+│   └── 2
+└── R
+    ├── 1
+    ├── 2
+    └── 3
+2.
+R
+├── R
+│   └── 1
+├── R
+│   ├── 1
+│   └── 2
+├── R
+│   └── R
+│       └── 1
+└── R
+    ├── 1
+    ├── 2
+    └── 3
+```
+As you can see, these 2 trees are topologically-equal, because if you exchange the root-children 2 and 3 of the second tree, you get the first tree.
+
+Because this trees correspond to this unflattened combination:
+`1.((A1) (B2 A2) (A3)) and 2.((A1) (A2 B2) (A3))`
+Which means that that among all the generated combination possibilities of the group (2 2), there were the possibilities
+```
+ps = 
+(
+ ...
+ (B2 A2)
+ ...
+ (A2 B2)
+ ...)
+```
+But remember that `ps` is as follow:
+```clojure
+val ps: List<List<Tree<String>>> = to-list(combinations-with-replacement(group-c-ps, length(g)))
+```
+And `combinations-with-replacement` would never generate those combinations.
+So we can safely say for sure that the grouped algorithm fixed this issue.
+
 ## Help
 This is just a little project, but feel free to fork, change, extend or correct the code.
 
