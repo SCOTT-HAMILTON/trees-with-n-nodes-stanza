@@ -1,34 +1,38 @@
 defpackage utils :
    import core
    import collections
+   import heap-augmented
 
 public defn repart (R: Int, N: Int, M: Int|False) -> List<List<Int>> :
-    val start = match(M) :
-        (_:False) : R
-        (m:Int) : min(m, R)
-    val possibilities = Vector<List<Int>>()
-    ; println("Start: %_" % [start])
-    label<False> break :
-        for i in in-reverse(1 to (start + 1)) do :
-            ; println("I: %_" % [i])
-            val left = R - i
-            if N - 1 < left:
-                break(false)
-            val b = Array<Int>(N, 0)
-            b[length(b) - 1] = i
-            if left == 0 :
-                add(possibilities, to-list(b))
-            else if left == 1 :
-                b[length(b) - 2] = 1
-                add(possibilities, to-list(b))
-            else if left > 1 :
-                val leftPossibilities = repart(left, N - 1, i)
-                for p in leftPossibilities do :
-                    val concat = to-vector<Int>(p)
-                    add(concat, i)
-                    add(possibilities, to-list(concat))
-            false
-    to-list(possibilities)
+    if R == 0 :
+        List(to-list(Array<Int>(N, 0)))
+    else :
+        val start = match(M) :
+            (_:False) : R
+            (m:Int) : min(m, R)
+        val possibilities = Vector<List<Int>>()
+        ; println("Start: %_" % [start])
+        label<False> break :
+            for i in in-reverse(1 to (start + 1)) do :
+                ; println("I: %_" % [i])
+                val left = R - i
+                if N - 1 < left:
+                    break(false)
+                val b = Array<Int>(N, 0)
+                b[length(b) - 1] = i
+                if left == 0 :
+                    add(possibilities, to-list(b))
+                else if left == 1 :
+                    b[length(b) - 2] = 1
+                    add(possibilities, to-list(b))
+                else if left > 1 :
+                    val leftPossibilities = repart(left, N - 1, i)
+                    for p in leftPossibilities do :
+                        val concat = to-vector<Int>(p)
+                        add(concat, i)
+                        add(possibilities, to-list(concat))
+                false
+        to-list(possibilities)
 
 public defn repart (R: Int, N: Int) -> List<List<Int>> :
     repart(R, N, false)
@@ -106,3 +110,34 @@ public defn combinations-with-replacement<T> (r: Int) :
         val seq = combinations-with-replacement(iterable, r)
         while not empty?(seq) :
               f(next(seq))
+
+public defn lazy-equal?<?T> (sa: Seqable<?T&Equalable>, sb: Seqable<T&Equalable>) -> True|False :
+    label<True|False> return :
+        val seqa = to-seq(sa) 
+        val seqb = to-seq(sb) 
+        while not empty?(seqa) :
+            val a = next(seqa)
+            if empty?(seqb) :
+                return(false)
+            val b = next(seqb)
+            if a != b :
+                return(false)
+        if not empty?(seqb) :
+            false
+        else :
+            true
+
+public defn lazy-flatten (x) :
+   generate :
+      defn loop (x) :
+         match(x) :
+            (x:List) : do(loop, x)
+            (x) : yield(x)
+      loop(x)
+
+public defn repart-unordered (R: Int, N: Int) :
+    generate<List<Int>> :
+        for r in repart(R, N) do :
+            for p in r heap-augmented :
+                yield(p)
+

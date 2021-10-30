@@ -10,6 +10,7 @@ main :
     "src/tree.stanza"
     "src/tree-utils.stanza"
     "src/utils.stanza"
+    "src/heap-augmented.stanza"
 
   ;List the stanza package to use as your main program
   ;entry point
@@ -52,4 +53,4 @@ main :
   ;  WITH-SANITY-CHECKS
 
   ;Uncomment this option to compile in optimized mode.
-  optimize
+  ;optimize

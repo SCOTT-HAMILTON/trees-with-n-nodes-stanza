@@ -3,6 +3,7 @@ defpackage tree/tests :
    import tree
    import tree/utils
    import utils
+   import heap-augmented
 
 public defn test-trees () :
     println("test tree 1")
@@ -71,6 +72,38 @@ public defn test-trees () :
         set-child(tree, 0, child)
         println("tree a: %_" % [tree])
 
+    println("\ntest set-child with dup and deep-copy")
+    let :
+        val tree = tr("A")
+                    - tr("B")
+                    - (tr("C") - tr("D") - tr("E"))
+        println("Internal Tree Before: %_" % [tree])
+        
+        val tmp-tree = deep-copy(tree)
+        set-child(tmp-tree, List(1L), tr("C-L") - tr("1") - tr("2"))
+        println("Internal Tree After: %_" % [tree])
+        println("Set-Child Tree: %_" % [tmp-tree])
+    println("\ntest add-deep-child")
+    let :
+        val tree = tr("A")
+                    - tr("B")
+                    - (tr("C") - tr("D") - tr("E"))
+
+        add-deep-child(tree, List(1L, 0L), "%")
+        add-deep-child(tree, List(1L, 0L), "%1")
+        println("Tree: %_" % [tree])
+    println("\ntest internal-tree-to-final-trees")
+    let :
+        val tree = tr("A")
+                    - tr("B")
+                    - (tr("C") - tr("D") - tr("E"))
+        println("Internal Tree: %_" % [tree])
+        var counter = 0
+        for t in internal-tree-to-final-trees(tree, 5) do :
+            println("T: %_" % [t])
+            counter = counter + 1
+        println("Counter: %_" % [counter])
+
 public defn test-utils () :
     println("test repart")
     let :
@@ -94,3 +127,14 @@ public defn test-utils () :
     let :
         for c in List("A", "B", "C") combinations-with-replacement<String>(2) :
             println("%_" % [c])
+
+    println("\ntest heap-augmented")
+    let :
+        val a = to-list([ 0, 1, 2, 2, 3])
+        for p in a heap-augmented :
+            println(p)
+
+    println("\ntest repart-unordered")
+    let :
+        for ru in repart-unordered(4, 4) do :
+            println("ru=%_" % [ru])

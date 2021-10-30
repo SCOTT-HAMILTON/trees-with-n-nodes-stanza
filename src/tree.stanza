@@ -5,38 +5,100 @@ defpackage tree :
 public defstruct Tree<T> <: Collection<Tree<T>> :
     value: T
     children: Vector<Tree<T>>
-    parent: Tree<T>|False with: (setter => set-parent)
+    parent: Tree<T>|False
+    child-id: Long|False with: (setter => set-child-id)
 public defmulti degree (t:Tree) -> Int
 public defmulti add-child<?T> (t:Tree<?T>, child-value: T) -> False
 public defmulti add-child<?T> (t:Tree<?T>, child-tree: Tree<T>) -> False
+public defmulti add-deep-child<?T> (t:Tree<?T>, child-dup: List<Long>, child-value: T) -> False
 public defmulti set-child<?T> (t:Tree<?T>, index: Int, child-tree: Tree<T>) -> True|False
+public defmulti set-child<?T> (t: Tree<?T>, child-dup: List<Long>, child-tree: Tree<T>) -> True|False
+public defmulti ascendant-unique-path<?T> (node: Tree<?T>) -> Seq<Long>
+public defmulti deep-copy<?T> (t: Tree<?T>, parent-destination: Tree<T>|False) -> Tree<T>
+public defmulti deep-copy<?T> (t: Tree<?T>) -> Tree<T>
+public defmulti update-children<?T> (t: Tree<?T>) -> False
 
-public defn Tree (init-root-value: String,
+public defn Tree (root-value: String,
            init-parent: Tree<String>|False,
            init-children-capacity: Int) :
     var mchildren = Vector<Tree<String>>(init-children-capacity)
-    var mvalue = init-root-value
     var mparent = init-parent
+    var mchild-id: Long|False = false
 
     new Tree<String> :
-        defmethod value (this) : mvalue
+        defmethod value (this) : root-value
         defmethod children (this) : mchildren
         defmethod parent (this) : mparent
-        defmethod set-parent (this, parent: Tree<String>) : mparent = parent
+        defmethod child-id (this) : mchild-id
+        defmethod set-child-id (this, id: Long) : mchild-id = id
         defmethod degree (this) :
             length(mchildren)
         defmethod add-child (this, child-value: String) :
             add(mchildren, Tree(child-value, this, 0))
+            val new-child = mchildren[length(mchildren) - 1]
+            set-child-id(new-child, to-long(length(mchildren)))
+
         defmethod add-child (this, child-tree: Tree<String>) :
-            set-parent(child-tree, this)
-            add(mchildren, child-tree)
+            val child = deep-copy(child-tree, this)
+            set-child-id(child-tree, to-long(length(mchildren)))
+            add(mchildren, child)
+        defmethod add-deep-child (this, child-dup: List<Long>, child-value: String) :
+            if length(child-dup) == 0 :
+                add-child(this, child-value)
+            else :
+                val index = to-int(head(child-dup))
+                if index < 0 or index >= length(mchildren) :
+                    false
+                else if length(child-dup) == 1 :
+                    add-child(mchildren[index], child-value)
+                else :
+                    add-deep-child(mchildren[index], tailn(child-dup, 1), child-value)
         defmethod set-child (this, index: Int, child-tree: Tree<String>) :
             if index < 0 or index >= length(mchildren) :
                 false
             else :
-                mchildren[index] = child-tree
-                set-parent(child-tree, mchildren[index])
+                val new-child = deep-copy(child-tree, this)
+                mchildren[index] = new-child
+                update-children(this)
                 true
+        defmethod set-child (this, child-dup: List<Long>, child-tree: Tree<String>) -> True|False :
+            if length(child-dup) == 0 :
+                false
+            else if length(child-dup) == 1 :
+                set-child(this, to-int(child-dup[0]), child-tree)
+            else :
+                val index = to-int(head(child-dup))
+                if index < 0 or index >= length(mchildren) :
+                    false
+                else :
+                    set-child(mchildren[index], tailn(child-dup, 1), child-tree)
+        defmethod ascendant-unique-path (this) -> Seq<Long> :
+            val result: List<Long> = match(child-id(this)) :
+                (_:False) : to-list([]) as List<Long>
+                (ci:Long) : List(ci)
+            ; println("this: %_" % [this])
+            ; println("parent: %_" % [parent(this)])
+            val value = match(parent(this)) :
+                (_:False) :
+                    ; println("False")
+                    to-seq(to-list([]) as List<Long>)
+                (p:Tree<String>) :
+                    ; println("True")
+                    cat(result, ascendant-unique-path(p))
+            ; println("Lol 3")
+            value
+        defmethod deep-copy (this, parent-destination: Tree<String>|False) -> Tree<String> :
+            val new-tree = Tree(value(this), parent-destination, length $ children $ this)
+            for c in children(this) do :
+                add-child(new-tree, deep-copy(c, new-tree))
+            new-tree
+        defmethod deep-copy (this) -> Tree<String> :
+            deep-copy(this, false)
+        defmethod update-children (this) -> False :
+            for i in 0 to length(mchildren) do :
+                set-child-id(mchildren[i], to-long(i))
+                update-children(mchildren[i])
+            false
         defmethod to-seq (this) :
             take-n(degree(this), mchildren)
         defmethod print (o:OutputStream, this) :
@@ -83,9 +145,3 @@ public defn Tree (init-root-value: String,
 
 public defn Tree (root-value: String) :
     Tree(root-value, false, 0)
-
-public defn DeepCopy (base: Tree<String>) -> Tree<String> :
-    var tree = Tree(value(base), false, length(children(base)))
-    for c in children(base) do :
-        add-child(tree, DeepCopy(c))
-    tree

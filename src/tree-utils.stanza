@@ -14,7 +14,7 @@ public defn tr (value: String) -> Tree<String> :
     Tree(value)
 
 public defn minus (t1: Tree<String>, t2: Tree<String>) -> Tree<String>:
-    var tree = DeepCopy(t1)
+    var tree = deep-copy(t1)
     add-child(tree, t2)
     tree
 
@@ -22,7 +22,7 @@ public defn apply-child-possibility (
         order: Seqable<Tree<String>> & Lengthable) ->  Tree<String>:
     val tree = Tree("R", false, length(order))
     for c in order do :
-        add-child(tree, DeepCopy(c))
+        add-child(tree, deep-copy(c))
     tree
 
 public defn apply-repartition (repartitions: List<Int>) :
@@ -46,13 +46,6 @@ public defn apply-repartition (repartitions: List<Int>) :
         add(groups-ps, ps)
 
     generate<Tree<String>> :
-        defn lazy-flatten (x) :
-           generate :
-              defn loop (x) :
-                 match(x) :
-                    (x:List) : do(loop, x)
-                    (x) : yield(x)
-              loop(x)
         for combination in to-list(groups-ps) all-combinations :
             val childs = to-list(lazy-flatten(combination))
             yield(apply-child-possibility(childs))
@@ -82,3 +75,171 @@ public defn trees-with-n-nodes (f: Tree<String> -> False, N: Int) :
     val seq = trees-with-n-nodes(N)
     while not empty?(seq) :
           f(next(seq))
+
+; public defn group-by-siblingness<?T> (node-list: List<Tree<?T>>) -> Seqable<List<Tree<T>>> :
+;     defn parent-a-u-p (t1: Tree<T>) -> String :
+;         match(parent(t1)) :
+;             (_:False) : false
+;             (p:Tree<T>) :
+;             val aup = ascendant-unique-path(p)
+;             val value = to-string $ to-list $ (match(parent(t1)) :
+;             (_:False) : to-seq(List(-1L)) as Seq<Long>
+;             (p:Tree<T>) : ascendant-unique-path(p))
+;         println("%_" % [value])
+;         value
+;     values $ group-by(parent-a-u-p, node-list)
+public defn group-by-siblingness<?T> (node-list: List<Tree<?T>>) -> Seqable<List<Tree<T>>> :
+    defn parent-a-u-p (t1: Tree<T>) -> String :
+        ; println("Parent-a-u-p of: %_" % [t1])
+        to-string $ to-list $ (match(parent(t1)) :
+            (_:False) : to-seq(List(-1L)) as Seq<Long>
+            (p:Tree<T>) : ascendant-unique-path(p))
+        ; println("%_" % [value])
+        ; value
+    values(group-by(parent-a-u-p, node-list))
+
+public defn all-nodes-if<?T> (predicate?: Tree<T> -> True|False,
+                       tree: Tree<?T>) -> List<Tree<T>> :
+    val result = Vector<Tree<T>>(length(children(tree)))
+    if predicate?(tree) :
+        add(result, tree)
+    for child in children(tree) do :
+        if predicate?(child) == 0 :
+            add(result, child)
+        else :
+            add-all(result, all-nodes-if(predicate?, child))
+    to-list(result)
+
+public defn non-leaf-nodes<?T> (tree: Tree<?T>) -> List<Tree<T>> :
+    all-nodes-if({length(children(_)) != 0}, tree)
+
+public defn leaf-nodes<?T> (tree: Tree<?T>) -> List<Tree<T>> :
+    all-nodes-if({length(children(_)) == 0}, tree)
+
+public defn internal-tree-to-final-trees (internal-tree: Tree<String>, M: Int) :
+    generate<Tree<String>> :
+        ; Very important because child-id's aren't garanteed to be right before that call
+        update-children(internal-tree)
+        val non-leaf-nodes = non-leaf-nodes(internal-tree)
+        val leaf-nodes = leaf-nodes(internal-tree)
+        if length(leaf-nodes) > M :
+            break()
+        if length(leaf-nodes) == 0 or length(non-leaf-nodes) == 0 :
+            println("[ERROR:internal-tree-to-final-trees] there can't be no leaf or non-leaf nodes")
+            break()
+        ; println("internal-tree: %_" % [internal-tree])
+        ; println("leaf-nodes:")
+        ; for n in leaf-nodes do :
+        ;     println("leaf-node = %_" % [n])
+        ;     println("leaf-node's AUP %_" % [to-list $ ascendant-unique-path $ n])
+        ; println("non-leaf-nodes:")
+        ; for n in non-leaf-nodes do :
+        ;     println("non-leaf-node = %_" % [n])
+        ;     println("non-leaf-node's AUP %_" % [to-list $ ascendant-unique-path $ n])
+        val min-nodes = length(leaf-nodes)
+        val left = M - min-nodes
+        if left < 0: 
+            ; Guarded by the length(leaf-nodes) <= M assert
+            fatal("Unreachable")
+        ; println("min-nodes=%_, left=%_" % [min-nodes, left])
+        defn aup-and-groupby (nodes-list: List<Tree<String>>) -> List<List<List<Long>>> :
+            map{ fn (g): map{
+                        fn (t: Tree<String>) : to-list $ ascendant-unique-path(t), _
+                    } $ g, _
+                } $ to-list $ group-by-siblingness $ nodes-list
+        ; println("Leaf Nodes: %_" % [leaf-nodes])
+        val leaf-node-groups = aup-and-groupby $ leaf-nodes
+        val non-leaf-node-groups = aup-and-groupby $ non-leaf-nodes
+        ; println("%_" % [leaf-node-groups])
+        ; println("%_" % [non-leaf-node-groups])
+        defn print-groups<?T> (groups: List<List<?T>>) :
+            for group in groups do :
+                println("Goup: ")
+                for item in group do :
+                    println("%_" % [item])
+        ; println("Non Leaf Nodes: ")
+        ; print-groups(non-leaf-node-groups)
+        ; println("Leaf Nodes: ")
+        ; print-groups(leaf-node-groups)
+
+        for r in repart-unordered(left, 2) do:
+            val left-nlngs = r[0] ; Order doesn't mater
+            val left-lngs = r[1]
+            defn groups-reparts<?T> (groups: List<List<?T>>, left: Int) -> List<List<Int>> :
+                if left > 0 :
+                    to-list(repart-unordered(left, length(groups)))
+                else :
+                    List(to-list(Array<Int>(length(groups), 0)))
+            val nlngs-reparts = groups-reparts(non-leaf-node-groups, left-nlngs)
+            val lngs-reparts = groups-reparts(leaf-node-groups, left-lngs)
+            ; println("left-non-leaf=%_, left-leaf=%_" % [left-nlngs, left-lngs])
+            ; println("non-leaf-reparts: %_" % [nlngs-reparts])
+            ; println("leaf-reparts: %_" % [lngs-reparts])
+            defn apply-groups-left<?T> (groups: List<List<?T>>, repartitions: List<List<Int>>)
+                -> List<List<List<List<Int>>>>:
+                ; to-list(map({apply-group-left(_[0], _[1])}, zip(groups, repartition)))
+                val result = Vector<List<List<List<Int>>>>(length(repartitions))
+                for rep in repartitions do:
+                    defn apply-group-left (args: [List<T>, Int]) -> List<List<Int>> :
+                        repart(args[1] as Int, length(args[0] as List<T>))
+                    add(result,
+                        map(apply-group-left, to-list $ zip(groups, rep)))
+                to-list(result)
+            defn groups-to-c-a-l (
+                            groups: List<List<List<Long>>>,
+                            groups-reparts: List<List<Int>>):
+                val results = Vector<List<[Int, List<Long>]>>()
+                for (l in apply-groups-left(groups, groups-reparts), r in groups-reparts) do :
+                    defn combination-to-action-list (c) -> List<[Int, List<Long>]> :
+                        defn zip-groups-repart-with-trees (
+                                groups-reparts: List<List<Int>>,
+                                groups: List<List<List<Long>>>) -> List<List<[Int, List<Long>]>> :
+                            defn zip-group-repart-with-trees (
+                                group-reparts: List<Int>,
+                                group: List<List<Long>>) :
+                                to-list(zip(group-reparts, group))
+                            map{
+                                fn (args: [List<Int>, List<List<Long>>]) :
+                                    zip-group-repart-with-trees(
+                                        args[0] as List<Int>,
+                                        args[1] as List<List<Long>>)
+                                , _} $ to-list $ zip(groups-reparts, groups)
+                        to-list $
+                            filter{fn (args) : args[0] != 0, _} $
+                            lazy-flatten $
+                            zip-groups-repart-with-trees(c, groups)
+                    add-all(results,
+                        map(combination-to-action-list, to-list $ all-combinations $ l))
+                to-list(results)
+            ; println("\nRESULTS leaf nodes: ")
+            ; println("\tALL - COMBINATIONS: ")
+            val ln-a-l = groups-to-c-a-l(leaf-node-groups, lngs-reparts)
+            val nln-a-l = groups-to-c-a-l(non-leaf-node-groups, nlngs-reparts)
+            ; println("\t%_" % [ln-a-l])
+            ; println("\nRESULTS non-leaf nodes: ")
+            ; println("\tALL - COMBINATIONS: ")
+            ; println("\t%_" % [nln-a-l])
+            val minimum-tree = deep-copy(internal-tree)
+            ; println("leaf-nodes")
+            for node-dup in
+                map(fn (n) : to-list $ in-reverse $ ascendant-unique-path $ n, leaf-nodes) do :
+                ; println("leafnode: %_" % [node-dup])
+                add-deep-child(minimum-tree, node-dup, "1")
+            ; println("min-tree: %_" % [minimum-tree])
+            for c in List(ln-a-l, nln-a-l) all-combinations :
+                val C-A-L = to-list $ lazy-flatten $ c
+                ; println("C-A-L: %_" % [C-A-L])
+                val min-tree = deep-copy(minimum-tree)
+                ; Applying C-A-L
+                for al in C-A-L do:
+                    for i in 0 to al[0] do :
+                        add-deep-child(min-tree, to-list $ in-reverse $ al[1], to-string(i + 2))
+                yield(min-tree)
+
+public defn trees-with-n-nodes-with-m-leaves (N: Int, M: Int) :
+    generate<Tree<String>> :
+        val internal-N = N - M
+        for internal-tree in trees-with-n-nodes(internal-N) do :
+            ; println("Internal tree: %_" % [internal-tree])
+            for final-tree in internal-tree-to-final-trees(internal-tree, M) do:
+                yield(final-tree)

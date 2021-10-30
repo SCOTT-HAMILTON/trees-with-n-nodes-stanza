@@ -1,0 +1,42 @@
+defpackage heap-augmented :
+   import core
+   import collections
+
+public defstruct IndexedInt <: Equalable :
+    index: Int
+    value: Int
+
+public defmethod equal? (a: IndexedInt, b: IndexedInt) -> True|False :
+    value(a) == value(b)
+
+public defmethod print (o: OutputStream, a: IndexedInt) :
+    print(o, "%_>%_" % [index(a), value(a)])
+
+public defn list-of-indexed-int (zipped-index-values: List<[Int, Int]>) -> List<IndexedInt>:
+    val result = Array<IndexedInt>(length(zipped-index-values))
+    for (index in 0 to length(zipped-index-values), iv in zipped-index-values) do :
+        val tmp: IndexedInt = IndexedInt(iv[0], iv[1])
+        result[index] = tmp
+    to-list(result)
+
+public defn heap-augmented (a: List<Int>) :
+    generate<List<Int>> :
+        val indexed-a = list-of-indexed-int(to-list(zip(0 to length(a), a)))
+        val indexed-a-unique: List<IndexedInt> = unique(indexed-a)
+        ; println("indexed-a-unique: %_" % [indexed-a-unique])
+        for ia in indexed-a-unique do :
+            val as-except-ia = to-list(filter({ index(_) != index(ia) }, indexed-a))
+            val cur-a = value(ia)
+            val as-except-a = map({value(_)}, as-except-ia)
+            ; println("(%_ %_)" % [cur-a, to-array<Int>(as-except-a)])
+            var recursed?: True|False = false
+            for l in as-except-a heap-augmented :
+                recursed? = true
+                yield(cons(cur-a, l))
+            if not recursed? :
+                yield(List(cur-a))
+
+public defn heap-augmented (f: List<Int> -> False, a: List<Int>) :
+    val seq = heap-augmented(a)
+    while not empty?(seq) :
+      f(next(seq))

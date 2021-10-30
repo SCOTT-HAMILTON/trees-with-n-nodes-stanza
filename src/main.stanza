@@ -6,15 +6,13 @@ defpackage tree/main :
    import tree/tests
    import utils
 
-    
-
 defn main () :
     ; test-trees()
     ; test-utils()
     var counter = 0
-    for t in 6 trees-with-n-nodes :
+    for t in trees-with-n-nodes-with-m-leaves(10, 5) do :
         counter = counter + 1
-        ; println("t: %_" % [t])
+        println("T#%_: %_" % [counter, t])
     println("counter: %_" % [counter])
-
 main()
+
