@@ -395,6 +395,274 @@ val ps: List<List<Tree<String>>> = to-list(combinations-with-replacement(group-c
 And `combinations-with-replacement` would never generate those combinations.
 So we can safely say for sure that the grouped algorithm fixed this issue.
 
+## trees-with-n-nodes-with-m-leaves
+This is the real final problem.
+It's the same as the previous problem but we add a condition on the
+number of leaf-nodes that the **final-trees** should have, the **final-trees**
+should have **M** leaf-nodes.
+
+Here is an example of a tree with `N=8 and M=5` or in other word
+8 nodes including 5 leaf-nodes: 
+```
+R
+└── R
+    ├── 1
+    │   ├── 1
+    │   ├── 2
+    │   ├── 3
+    │   └── 4
+    └── 2
+```
+In total there are 17 trees with 8 nodes including 5 leaf-nodes.A
+
+The main function responsible for this solution is here:
+```clojure
+public defn trees-with-n-nodes-with-m-leaves (N: Int, M: Int) :
+    generate<Tree<String>> :
+        val internal-N = N - M
+        for internal-tree in trees-with-n-nodes(internal-N, M + 1) do :
+            ; println("Internal tree: %_" % [internal-tree])
+            for final-tree in internal-tree-to-final-trees(internal-tree, M) do:
+                yield(final-tree)
+```
+It first generates what I call **internal-trees**.
+Let's take the last example `N=8 and M=5`.
+The problem is thought as follows.
+We know that we need to have `M` leaf-nodes at the end.
+So we place them at the bottom, laying.
+And what are we left with? Well 8 total nodes. Meaning that we know for sure
+that there will be `N-M` **non-leaf-nodes**. In our example there will be
+8-5=3 **non-leaf-nodes** at the end. And this is basically our **internal-trees**.
+We know that we have to take in consideration all (actually not all but we will see that in the optimization section) **internal-trees**.
+In this example there are only 2 possible **internal-trees** because there exists only 2 possible
+trees with 3 nodes:
+```
+1.      2.
+R       R
+├── 1   └── R
+└── 2       └── 1
+```
+As you can tell, there was a reason why we first solved the `trees-with-n-nodes` problem before
+solving the final problem, and this is because we use the first solution in our final solution.
+Then comes the harder part of the problem, which is to find a way to include all `M` leaf-nodes laying
+around at the bottom and attach them to each **internal-tree** to get a **final-tree**. And we eaven have to
+find all the possible ways to attach them to each **internal-tree**.
+
+Here is a few examples of attaching the 5 leaf-nodes to the first **internal-tree**:
+```
+R            R            R
+├── 1        ├── 1        ├── 1
+│   ├── A    │   ├── A    │   ├── A
+│   ├── B    │   ├── B    │   └── B
+│   └── C    │   └── C    ├── 2
+└── 2        ├── 2        │   └── C
+    ├── D    │   └── D    ├── D
+    └── E    └── E        └── E
+```
+Note that we can even attach some nodes to the root node.
+And this introduction brings us to the second most important function
+of the solution:
+```clojure
+public defn internal-tree-to-final-trees (internal-tree: Tree<String>, M: Int) :
+    generate<Tree<String>> :
+		[...]
+		; Part 1
+        val non-leaf-nodes = non-leaf-nodes(internal-tree)
+        val leaf-nodes = leaf-nodes(internal-tree)
+		[..]
+        val min-nodes = length(leaf-nodes)
+        val left = M - min-nodes
+		[...]
+		; Part 2
+        defn aup-and-groupby (nodes-list: List<Tree<String>>) -> List<List<List<Long>>> :
+			[...]
+        ; println("Leaf Nodes: %_" % [leaf-nodes])
+        val leaf-node-groups = aup-and-groupby $ leaf-nodes
+        val non-leaf-node-groups = aup-and-groupby $ non-leaf-nodes
+		[...]
+```
+I divided this gigantic function into parts to better understand it and cut the end where it gets really messy.
+This function takes an **internal-tree** and M, and it generates all possible **final-trees**, or in other words,
+all the possible ways to attach the leaf-nodes to the **internal-tree**.
+
+The base of the solution relies in the separation between leaf-nodes **of** the **internal-tree**
+(not leaf-nodes of the **final-tree**) and non-leaf-nodes **of** the **internal-tree**.
+To be sure that we are in phase, let's say that leaf-nodes are rendered as an L and non-leaf nodes
+are rendered as an N and let's print the to **internal-trees** above with this convention:
+```
+1.      2.
+N       N
+├── L   └── N
+└── L       └── L
+```
+Next we attach enumerate each node so that we can differentiate them.
+We drop the second **internal-tree** to focus on the first one.
+```
+1.
+N1
+├── L1
+└── L2
+```
+If we wanted to store the non-leaf-nodes an the leaf-nodes into two lists, those list would look like that:
+```clojure
+val non-leaf-nodes = List( N1 )
+val leaf-nodes = List( L1, L2 )
+```
+The most important rule when attaching the **final** leaf-nodes to the **internal-trees**
+(please not the **final**), is that a leaf-node **of** the **internal-tree** should have at least
+1 **final** leaf-node attached to it.
+
+This because if, for example, you only attach the **final** leaf-nodes to non-leaf-nodes of the **internal-tree**, then you end up with a **final-tree** that has more than M leaf-nodes, because it has all the 
+**final** leaf-nodes but also all the leaf-nodes of the **internal-tree** that didn't get anything attached to them.
+Let's take the first **internal-tree** and let's attach all the **final** leaf-nodes to the only non-leaf-node
+**of** this **internal-tree**. The resulting **final-tree** will look like that:
+```
+N1
+ ├── L1
+ ├── L2
+ ├── A
+ ├── B
+ ├── C
+ ├── D
+ └── E
+```
+You immediatly see that because we didn't attach anything to the L-nodes, they get counted as final leaf-nodes
+and this **final-tree** is invalid.
+In reality, each time you forget to attach something to an L-node (let's call them like that, it's easier
+than "leaf-nodes **of** the **internal-tree**"), you'll end up with a final-tree with one more final leaf-node.
+In our example, we forgot to attach something to both L-nodes so we ended up with a tree that has 2 extra
+leaf-node.
+
+That's the reason why we separate L-nodes and N-nodes, because N-nodes can be forgotten without it having any
+consequences on the number of **final** leaf-nodes.
+
+The Part 1 just stores all the non-leaf-nodes of the **internal-tree** into an array of nodes.
+We do the same with the leaf-nodes.
+
+```clojure
+val min-nodes = length(leaf-nodes)
+val left = M - min-nodes
+```
+Then this line above gets the number of L-nodes which we now know is the number of
+**final** leaf-nodes for which we already know the destination.
+And it calculates the left number of laying leaf-nodes for which we will have to work on a
+destination.
+
+The second part of this function uses what I call the `ascendant-unique-path` of a node.
+This is a way of indexing each node with a unique identifier in the tree.
+The AUP in short is a list of indices that starts from the node and moves us up
+to the root node. Each index corresponds to the index of the child-node the path
+took to get to the root node.
+
+For example, consider this tree:
+```
+R
+├── A
+├── B
+├── C
+├── D
+└── E
+```
+The node C is the third child of it's parent, the root-node R.
+It's AUP is `(2)`.
+Here is a table to sum up all the AUPs:
+
+| Node | AUP |
+|------|-----|
+| R    | ()  |
+| A    | (0) |
+| B    | (1) |
+| C    | (2) |
+| D    | (3) |
+| E    | (4) |
+
+You see that by convention, every root-node have an AUP equal to the empty list ().
+
+But the AUP is really useful to index nodes that are deeply hidden in a tree. Let's consider this tree:
+```
+R
+├── A
+├── B
+├── C
+└── D
+    └── E
+        ├── F
+        └── G
+```
+The F-node is the first child of the E-node.
+
+The E-node is the first and only child of the D node.
+
+And the D-node is the fourth child of the root-node R.
+
+So AUP of the F-node will be `(0 0 3)`
+And you've guested it, the G-node's AUP will be `(1 0 3)`
+From bottom to top.
+
+And please note that the AUP indexing method doesn't take into consideration the value of each node, so
+if we consider this identic tree but with different node-values:
+```
+1
+├── 2
+├── 3
+├── 4
+└── 5
+    └── 6
+        ├── 7
+        └── 8
+```
+We realize that the 7-node will have the same AUP as the F-node of the previous tree, same for the
+8-node and the G-node.
+
+The inverse of AUP is DUP which stands for Descendant Unique Path which is basically computed by
+reading the AUP in reverse, here is the DUP of the G-node: `(3 0 1)`.
+
+The reason why we have both DUPs and AUPs is simply that it's easier to compute directly the AUP of a node and convert it to a DUP.
+And the other way around, it's easier to take a tree and a DUP and find the corresponding Node.
+
+```clojure
+	; Part2
+	defn aup-and-groupby (nodes-list: List<Tree<String>>) -> List<List<List<Long>>> :
+		[...]
+	; println("Leaf Nodes: %_" % [leaf-nodes])
+	val leaf-node-groups = aup-and-groupby $ leaf-nodes
+	val non-leaf-node-groups = aup-and-groupby $ non-leaf-nodes
+```
+Here is the second part of the function.
+We first group the leaf-nodes into groups of leaf-nodes that have the same parent, we
+call it siblingness-grouping. And once we have our groups, we don't actually keep those
+node objects but only there AUP index.
+And we do the same for the non-leaf-nodes.
+
+So end up with a two list of groups of AUP's which get's already quite ugly looking when printed out.
+Let's take the first **internal-tree** of our example and compute those two lists.
+```
+N1
+ ├── L1
+ └── L2
+```
+We end up with:
+```
+leaf-node-groups = ( ((1) (0)) )
+```
+There is a single group because both L-nodes share the same parent, the root-node N1.
+The single group contains the two L-nodes
+```
+L1's AUP=(0)
+L2's AUP=(1)
+The group: (L2 L1)=((1) (0))
+The final list of groups: ( ((1) (0)) )
+```
+```
+non-leaf-node-groups = ( (()) )
+```
+There is a single N-node, so only one group.
+```
+N1's AUP=() because it's the root-node
+The group: (N1)=(())
+The final list of groups: ( (()) )
+```
+
 ## Help
 This is just a little project, but feel free to fork, change, extend or correct the code.
 
