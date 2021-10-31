@@ -413,7 +413,7 @@ R
     │   └── 4
     └── 2
 ```
-In total there are 17 trees with 8 nodes including 5 leaf-nodes.
+In total there are 21 trees with 8 nodes including 5 leaf-nodes.
 
 The main function responsible for this solution is here:
 ```clojure
