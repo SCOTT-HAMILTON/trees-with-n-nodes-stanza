@@ -60,7 +60,7 @@ public defn test-trees () :
     println("\ntest apply-repartition")
     let : 
         val repartitions = List(1, 2, 2)
-        for p in repartitions apply-repartition :
+        for p in repartitions apply-repartition(false) :
             println("P: %_" % [p])
 
     println("\ntest set-child")

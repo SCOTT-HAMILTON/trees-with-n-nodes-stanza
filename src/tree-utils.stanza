@@ -25,7 +25,7 @@ public defn apply-child-possibility (
         add-child(tree, deep-copy(c))
     tree
 
-public defn apply-repartition (repartitions: List<Int>) :
+public defn apply-repartition (repartitions: List<Int>, max-root-children: Int|False) :
     val groups-ps = Vector<List<List<Tree<String>>>>()
     val indexed-reparts = zip(0 to length(repartitions), repartitions)
     val g-reparts-table = group-by({_[1]}, indexed-reparts)
@@ -41,7 +41,7 @@ public defn apply-repartition (repartitions: List<Int>) :
         val group-c-ps = if r == 0 :
             to-array<Tree<String>>([ make-tree(0) ])
         else :
-            to-array<Tree<String>>(trees-with-n-nodes(r + 1))
+            to-array<Tree<String>>(trees-with-n-nodes(r + 1, max-root-children))
         val ps: List<List<Tree<String>>> = to-list(combinations-with-replacement(group-c-ps, length(g)))
         add(groups-ps, ps)
 
@@ -50,14 +50,27 @@ public defn apply-repartition (repartitions: List<Int>) :
             val childs = to-list(lazy-flatten(combination))
             yield(apply-child-possibility(childs))
 
-public defn apply-repartition (f: Tree<String> -> False, repartitions: List<Int>) :
-    val seq = apply-repartition(repartitions)
-    while not empty?(seq) :
-          f(next(seq))
+public defn apply-repartition (max-root-children: Int|False) :
+    fn (f: Tree<String> -> False, repartitions: List<Int>) :
+        val seq = apply-repartition(repartitions, max-root-children)
+        while not empty?(seq) :
+              f(next(seq))
 
-public defn trees-with-n-nodes (N: Int) :
+public defn trees-with-n-nodes (N: Int, max-root-children: Int|False) :
     generate<Tree<String>> :
-        for root-childs in in-reverse(1 to N) do :
+        val start-opti   = true
+        val recurse-opti = true
+        val start = if start-opti :
+            match(max-root-children) :
+            (_:False) : N
+            (s:Int) :
+                if s >= 1 and s <= N :
+                    s
+                else :
+                    N
+        else :
+            N
+        for root-childs in in-reverse(1 to start) do :
             val tree = make-tree(root-childs)
             val left = N - root-childs - 1
             if left == 0 :
@@ -68,26 +81,23 @@ public defn trees-with-n-nodes (N: Int) :
             else if left > 1 :
                 val repartitions = repart(left, root-childs)
                 for repartition in repartitions do :
-                    for t in repartition apply-repartition:
+                    val m = if recurse-opti :
+                        match(max-root-children) :
+                        (_:False) : max-root-children
+                        (max-rc:Int) : max(1, max-rc - root-childs + 1)
+                    else :
+                        false
+                    for t in repartition apply-repartition(m):
                         yield(t)
     
+public defn trees-with-n-nodes (N: Int) :
+    trees-with-n-nodes(N, false)
+
 public defn trees-with-n-nodes (f: Tree<String> -> False, N: Int) :
     val seq = trees-with-n-nodes(N)
     while not empty?(seq) :
           f(next(seq))
 
-; public defn group-by-siblingness<?T> (node-list: List<Tree<?T>>) -> Seqable<List<Tree<T>>> :
-;     defn parent-a-u-p (t1: Tree<T>) -> String :
-;         match(parent(t1)) :
-;             (_:False) : false
-;             (p:Tree<T>) :
-;             val aup = ascendant-unique-path(p)
-;             val value = to-string $ to-list $ (match(parent(t1)) :
-;             (_:False) : to-seq(List(-1L)) as Seq<Long>
-;             (p:Tree<T>) : ascendant-unique-path(p))
-;         println("%_" % [value])
-;         value
-;     values $ group-by(parent-a-u-p, node-list)
 public defn group-by-siblingness<?T> (node-list: List<Tree<?T>>) -> Seqable<List<Tree<T>>> :
     defn parent-a-u-p (t1: Tree<T>) -> String :
         ; println("Parent-a-u-p of: %_" % [t1])
@@ -123,6 +133,8 @@ public defn internal-tree-to-final-trees (internal-tree: Tree<String>, M: Int) :
         val non-leaf-nodes = non-leaf-nodes(internal-tree)
         val leaf-nodes = leaf-nodes(internal-tree)
         if length(leaf-nodes) > M :
+            println("BAIT")
+            ; println("BAIT: %_" % [internal-tree])
             break()
         if length(leaf-nodes) == 0 or length(non-leaf-nodes) == 0 :
             println("[ERROR:internal-tree-to-final-trees] there can't be no leaf or non-leaf nodes")
@@ -239,7 +251,7 @@ public defn internal-tree-to-final-trees (internal-tree: Tree<String>, M: Int) :
 public defn trees-with-n-nodes-with-m-leaves (N: Int, M: Int) :
     generate<Tree<String>> :
         val internal-N = N - M
-        for internal-tree in trees-with-n-nodes(internal-N) do :
+        for internal-tree in trees-with-n-nodes(internal-N, M + 1) do :
             ; println("Internal tree: %_" % [internal-tree])
             for final-tree in internal-tree-to-final-trees(internal-tree, M) do:
                 yield(final-tree)
