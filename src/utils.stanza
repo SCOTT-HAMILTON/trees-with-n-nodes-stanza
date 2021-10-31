@@ -38,8 +38,9 @@ public defn repart (R: Int, N: Int, M: Int|False) -> List<List<Int>> :
 public defn repart (R: Int, N: Int) -> List<List<Int>> :
     repart(R, N, false)
 
-public defn all-combinations<?T> (list-set: List<List<?T>>) :
+public defn all-combinations<?T> (plist-set: List<List<?T>>) :
     generate<List<T>> :
+        val list-set = to-list $ filter{{length(_) > 0}, _} $ plist-set
         defn order-to-values (order: Seqable<Int> & Lengthable) :
             val list-order = to-list(order)
             map(fn (o: Int, index: Int): list-set[index][o], list-order, 0 to length(list-order))
