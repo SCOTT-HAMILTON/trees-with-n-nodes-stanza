@@ -1,0 +1,29 @@
+defpackage eddie-tree/config :
+   import core
+
+public defstruct Config <: Equalable&Hashable:
+    N: Int
+    M: Int
+public defmulti C-N (c: Config) -> Int
+public defmulti C-M (c: Config) -> Int
+
+public defmethod equal? (a: Config, b: Config) -> True|False :
+    (C-N(a) == C-N(b)) and (C-M(a) == C-M(b))
+
+defn cantor-pairing (x: Int, y: Int) -> Int:
+    to-int((x + y) * (x + y + 1) / 2 + y)
+
+defmethod hash (config: Config) -> Int :
+    cantor-pairing(C-N(config), C-M(config))
+
+public defn C (n: Int, m: Int) -> Config:
+    new Config :
+        defmethod C-N (this) : n
+        defmethod C-M (this) : m
+        defmethod print (o:OutputStream, this) :
+            if n == 0 and m == 0:
+                print(o, "C()")
+            else:
+                print(o, "C(%_, %_)" % [n, m])
+
+

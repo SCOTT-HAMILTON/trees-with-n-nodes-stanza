@@ -5,14 +5,26 @@ defpackage tree/main :
    import tree/utils
    import tree/tests
    import utils
+   import eddie-tree/utils
+   import eddie-tree/config
+   import eddie-tree/tree-utils
+   import eddie-tree/tests
 
 defn main () :
     ; test-trees()
     ; test-utils()
-    var counter = 0
-    for t in trees-with-n-nodes-with-m-leaves(10, 5) do :
-        counter = counter + 1
-        println("T#%_: %_" % [counter, t])
-    println("counter: %_" % [counter])
-main()
+    ; eddie-test-utils()
+    println("Uncle Eddie's Algorithm: ")
+    let:
+        var counter = 0
+        for t in eddie-trees-with-n-nodes-with-m-leaves(7, 2) do:
+            counter = counter + 1
+            println("TE#%_: %_" % [counter, t])
 
+    println("Scott's Algorithm: ")
+    let:
+        var counter = 0
+        for t in trees-with-n-nodes-with-m-leaves(7, 2) do:
+            counter = counter + 1
+            println("TS#%_: %_" % [counter, t])
+main()

@@ -1,0 +1,140 @@
+defpackage eddie-tree/tree-utils :
+   import core
+   import collections
+   import tree
+   import utils
+   import eddie-tree/config
+   import eddie-tree/utils
+   import tree/utils
+
+public defstruct ChildList <: Collection<ChildList|Config>:
+    children: List<ChildList|Config>
+public defn ChildList () :
+    ChildList(List())
+defmethod print (o: OutputStream, cl: ChildList):
+    print(o, "[")
+    var first = true
+    for c in children(cl) do:
+        if first: first = false
+        else : print(o, " ")
+        print(o, "%_" % [c])
+    print(o, "]")
+defmethod to-seq (cl: ChildList) : to-seq $ children $ cl
+
+public defstruct EddieData:
+    possible-children: HashTable<Config, List<ChildList>>
+public defmulti get-possible-children (d: EddieData, n: Int, M: Int)
+public defmulti build-possible-children-with-exactly-mleaves (d: EddieData, n: Int, m: Int)
+public defmulti build-possible-children (d: EddieData, n: Int, m: Int)
+
+public defn EddieData () -> EddieData:
+    val data = HashTable<Config, List<ChildList>>()
+    new EddieData :
+        defmethod possible-children (this) : data
+        defmethod get-possible-children (this, n: Int, M: Int) -> List<ChildList>:
+            if n <= 1:
+                List()
+            else:
+                if not key?(data, C(n, M)):
+                    val instance = Array<False>(n, false)
+                    val collection = to-list(gather-combinations(1, n - 1, n - 1, M, M, to-list(instance), 0))
+                    data[C(n, M)] = map{{ChildList(_)}, _} $ collection
+                data[C(n, M)]
+        defmethod build-possible-children-with-exactly-mleaves (this, n: Int, m: Int) :
+            for Children in get-possible-children(this, n, m) do :
+                for subtree in children(Children) do:
+                    build-possible-children-with-exactly-mleaves(this, C-N(subtree as Config), C-M(subtree as Config))
+        defmethod build-possible-children (this, n: Int, m: Int):
+            clear(data)
+            for l in 1 to (m + 1) do:
+                build-possible-children-with-exactly-mleaves(this, n, l)
+            data
+        defmethod print (o:OutputStream, this) :
+            print(o, "{")
+            var first = true
+            for k in keys(data) do :
+                if first : first = false
+                else : print(o, "\n ")
+                print(o, "%_: %_" % [k, data[k]])
+            println(o, "}")
+    
+public defn no-config-recurse (cl-or-c: ChildList|Config):
+    match(cl-or-c):
+        (c:Config) : c == C(0, 0)
+        (cl:ChildList) :
+            no-config-recurse $ children $ cl
+
+public defn no-config-recurse (l: List):
+    label<True|False> return:
+        ; println("list no-config-recurse: %_" % [l])
+        for c in l do:
+            ; println("c recurse: %_" % [c])
+            if not no-config-recurse(c):
+                return(false)
+        true
+        
+public defn expand-child-list (
+        child-list: ChildList,
+        intermediate-data: HashTable<Config, List<ChildList>>):
+    generate<ChildList> :
+        defn expand-child (c: Config|ChildList) -> List<ChildList|Config>:
+            val return-value = match(c) :
+                (config:Config) :
+                    if config == C(1, 1) or config == C(0, 0):
+                        List(C(0, 0))
+                    else :
+                        val expanded = intermediate-data[config]
+                        expanded
+                (cl:ChildList) : 
+                    val children-count = length $ children $ cl
+                    val list-set = Array<List<ChildList|Config>>(children-count)
+                    for (child in children(cl), index in 0 to children-count) do:
+                        val child-ps: List<ChildList|Config> = expand-child $ child
+                        list-set[index] = child-ps
+                    val combinations: List<List<ChildList|Config>> =
+                        to-list $ all-combinations $ to-list $ list-set
+                    map{{ChildList(_)}, _} $ combinations
+            ; println("input:%_ -> %_" % [c, return-value])
+            return-value
+        val list-set: List<List<ChildList|Config>> =
+                map{{expand-child(_)}, _} $ children $ child-list
+        for c in list-set all-combinations:
+            val cleaned-c = ChildList $ c
+            if no-config-recurse(cleaned-c):
+                ; println("root: %_, final config: %_" % [child-list, cleaned-c])
+                yield(cleaned-c)
+            else:
+                for e-c in expand-child-list(cleaned-c, intermediate-data) do:
+                    yield(e-c)
+        
+public defn expanded-child-list-to-tree (e-c: ChildList):
+    val children-count = length $ children $ e-c
+    val tree = make-tree(children-count)
+    for (c in children(e-c), index in 0 to children-count) do:
+        val subtree = match(c) :
+            (config:Config) :
+                if config == C(0, 0):
+                    tr("1")
+                else:
+                    fatal("Can't make a tree out of a non-fully-expanded ChildList")
+            (c-l:ChildList) : 
+                deep-copy $ expanded-child-list-to-tree $ c-l
+        set-child(
+            tree,
+            List $ to-long $ index,
+            subtree)
+    tree
+
+public defn eddie-trees-with-n-nodes-with-m-leaves (N: Int, M: Int):
+    generate<Tree<String>> :
+        val e-d = EddieData()
+        val intermediate-data = build-possible-children(e-d, N, M)
+        intermediate-data[C(1, 1)] = List(C(0, 0))
+        ; print("%_" % [e-d])
+        val configurations = intermediate-data[C(N, M)]
+        val config = configurations[0]
+        for config in configurations do:
+            ; println("config: %_" % [config])
+            for e-c in expand-child-list(config, intermediate-data) do :
+                ; println("final expanded: %_" % [e-c])
+                yield $ expanded-child-list-to-tree $ e-c

@@ -1,0 +1,30 @@
+defpackage eddie-tree/utils :
+   import core
+   import collections
+   import eddie-tree/config
+
+public defn gather-combinations (
+                    i: Int,
+                    s: Int,
+                    N: Int,
+                    t: Int,
+                    M: Int,
+                    instance: List<Config|False>,
+                    index: Int):
+    generate<List<Config>> :
+        val cut-instance =
+            (to-list $ filter{{_ is Config}, _} $ headn{_, index} $ instance)
+                as List<Config>
+        val n = sum $ map{{C-N(_)}, _} $ cut-instance
+        val m = sum $ map{{C-M(_)}, _} $ cut-instance
+        if (n > N) or (m > M) :
+            break()
+        if (n == N) and (m == M):
+            yield(cut-instance)
+        for j in i to (s + 1) do:
+            for k in 1 to (t + 1) do:
+                if (k < j) or ((j == 1) and (k == j)):
+                    val i-array = to-array<Config|False>(instance)
+                    i-array[index] = C(j, k)
+                    for c in gather-combinations(j, s - j, N, t - k, M, to-list(i-array), index + 1) do:
+                        yield(c)

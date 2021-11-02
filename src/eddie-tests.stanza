@@ -1,0 +1,17 @@
+defpackage eddie-tree/tests :
+   import core
+   import collections
+   import eddie-tree/config
+   import eddie-tree/utils
+   import eddie-tree/tree-utils
+
+public defn eddie-test-utils () :
+    println("test gather-combinations:")
+    let :
+        for c in gather-combinations(1, 6, 6, 2, 2, to-list([false, false, false, false, false, false, false]), 0) do:
+            println("c: %_" % [c])
+    println("test build-possible-children:")
+    let :
+        val e-d = EddieData()
+        val intermediate-data = build-possible-children(e-d, 7, 2)
+        print("%_" % [e-d])
